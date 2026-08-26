@@ -2,6 +2,10 @@
 
 Multi-agent system for building apps autonomously. Works in **Cursor** and **Claude Code**.
 
+This repository is a **template**: it holds only the agent/skill framework, not any
+generated application. The reference app built with this loop lives in its own repo:
+**[leeran7/building-blocks](https://github.com/leeran7/building-blocks)**.
+
 ## Quick start (Claude Code)
 
 ```
@@ -33,6 +37,10 @@ Shared runtime artifacts live in `loop/` (not platform-specific):
 - `loop/state.json` — current stage and iteration
 - `loop/handoffs/` — JSON handoffs between agents
 - `loop/spec.md`, `loop/architecture.md`, etc. — stage outputs
+- `loop/learnings.md` + `loop/learnings.jsonl` — **persistent cross-agent memory.**
+  Every agent reads it before working and records findings after; the orchestrator
+  runs a retro each iteration that folds learnings in and promotes recurring ones to
+  standing rules. Never deleted between runs. See `skills/closed-loop/learning-loop.md`.
 
 ## Full agent roster
 
