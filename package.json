@@ -1,8 +1,13 @@
 {
-  "name": "building-blocks",
+  "name": "closed-loop-agents",
   "private": true,
+  "description": "Reusable closed-loop agent pack. Fill in context/ for your repo. See pack/SETUP.md.",
   "scripts": {
-    "loop": "pnpm --dir orchestrator loop",
-    "sync": "node scripts/sync.mjs"
+    "sync": "node scripts/sync.mjs",
+    "hygiene": "node scripts/hygiene.mjs",
+    "loop": "yarn --cwd orchestrator loop",
+    "test:orchestrator": "yarn --cwd orchestrator test",
+    "test:pack": "node scripts/hygiene.mjs",
+    "init": "node scripts/init-pack.mjs"
   }
 }
