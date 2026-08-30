@@ -183,7 +183,6 @@ export const POWER_UP_SPECS: Record<PowerUpType, PowerUpSpec> = {
     type: "double-jump",
     label: "Double Jump",
     description: `${DOUBLE_JUMP_CHARGES} extra jumps in mid-air`,
-    glyph: "⇡",
     color: "#a98cf5",
     durationSeconds: 18,
     cooldownSeconds: 0,
