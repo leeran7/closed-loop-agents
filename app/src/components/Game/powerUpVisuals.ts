@@ -157,6 +157,31 @@ export const POWER_UP_ICON_GEOMETRY: Record<PowerUpType, PowerUpIconGeometry> = 
       },
     ],
   },
+  "double-jump": {
+    viewBox: ICON_VIEWBOX,
+    layers: [
+      {
+        paint: "fill",
+        strokeWidth: 0,
+        commands: [
+          { t: "M", x: 4, y: 12 },
+          { t: "L", x: 12, y: 4 },
+          { t: "L", x: 20, y: 12 },
+          { t: "L", x: 16.5, y: 12 },
+          { t: "L", x: 12, y: 7.5 },
+          { t: "L", x: 7.5, y: 12 },
+          { t: "Z" },
+          { t: "M", x: 4, y: 20 },
+          { t: "L", x: 12, y: 12 },
+          { t: "L", x: 20, y: 20 },
+          { t: "L", x: 16.5, y: 20 },
+          { t: "L", x: 12, y: 15.5 },
+          { t: "L", x: 7.5, y: 20 },
+          { t: "Z" },
+        ],
+      },
+    ],
+  },
   giant: {
     viewBox: ICON_VIEWBOX,
     layers: [
@@ -269,6 +294,20 @@ export const POWER_UP_ORB_BODIES: Record<PowerUpType, OrbBodyGeometry> = {
       { t: "L", x: 0.2, y: 0.72 },
       { t: "L", x: -0.95, y: 0.72 },
       { t: "L", x: -0.55, y: 0 },
+      { t: "Z" },
+    ],
+  },
+  "double-jump": {
+    fill: ORB_BODY_FILL,
+    strokeWidthFrac: ORB_STROKE_WIDTH_FRAC,
+    commands: [
+      { t: "M", x: 0, y: -1 },
+      { t: "L", x: 0.85, y: 0.1 },
+      { t: "L", x: 0.32, y: 0.1 },
+      { t: "L", x: 0.32, y: 1 },
+      { t: "L", x: -0.32, y: 1 },
+      { t: "L", x: -0.32, y: 0.1 },
+      { t: "L", x: -0.85, y: 0.1 },
       { t: "Z" },
     ],
   },
