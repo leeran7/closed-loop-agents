@@ -167,6 +167,14 @@ function resolveSkillsSourceDirs(targetRoot) {
   return dirs;
 }
 
+async function resolveProtocol(targetRoot) {
+  const packagePath = join(PACKAGE_ROOT, "skills", "closed-loop", "protocol.md");
+  const localPath = join(targetRoot, "skills", "closed-loop", "protocol.md");
+  const isOverlay = resolve(targetRoot) !== resolve(PACKAGE_ROOT);
+  const source = isOverlay && (await exists(localPath)) ? localPath : packagePath;
+  return readFile(source, "utf-8");
+}
+
 async function resolveHandoffsSchema(targetRoot) {
   const packagePath = join(PACKAGE_ROOT, "handoffs", "schema.json");
   const localPath = join(targetRoot, "handoffs", "schema.json");
@@ -280,7 +288,7 @@ async function syncAgentsMd(targetRoot) {
 export async function sync(targetRoot = process.cwd()) {
   targetRoot = resolve(targetRoot);
   await runHygiene();
-  const protocolBody = await readFile(join(PACKAGE_ROOT, "skills", "closed-loop", "protocol.md"), "utf-8");
+  const protocolBody = await resolveProtocol(targetRoot);
   await syncAgents(targetRoot, protocolBody);
   await syncSkills(targetRoot);
   await syncHandoffsSchema(targetRoot);
