@@ -1,111 +1,106 @@
-# Add closed-loop agents to a new repo
+# Add closed-loop agents to a repo
 
 This is the file-structure write-up. Follow it once; agents stay generic and
 read **your** `context/` after that.
 
-## Two repositories
+## This repo is the package
 
 | Repo | Role |
 |------|------|
-| [leeran7/closed-loop-agents](https://github.com/leeran7/closed-loop-agents) | **Template / pack.** Clone this, or run `init-pack` from it. `context/` is placeholders. |
-| [leeran7/building-blocks](https://github.com/leeran7/building-blocks) | **Product** that vendors the pack. `context/` is filled in. `app/` is The Climb. |
+| [leeran7/closed-loop-agents](https://github.com/leeran7/closed-loop-agents) | **Owns the package.** Install it as a dependency; `context/` here is placeholders. |
+| [leeran7/building-blocks](https://github.com/leeran7/building-blocks) | **A consumer.** Depends on this package, fills in `context/`, and can override or extend any agent/skill locally. `app/` is The Climb. |
 
-New product:
+New or existing repo — add the dependency and generate the platform files:
 
 ```bash
-git clone https://github.com/leeran7/closed-loop-agents.git my-app
-cd my-app
+yarn add -D github:leeran7/closed-loop-agents#main
 # fill in context/profile.json, gates.json, trust.md, git.md, conventions.md
-yarn --cwd orchestrator install
-node scripts/sync.mjs
+npx closed-loop-agents sync
 ```
 
-Or vendor into an existing tree from a pack clone:
+Can't take a package dependency (offline, air-gapped)? Vendor a full copy
+instead — you then own keeping it current by hand:
 
 ```bash
-node scripts/init-pack.mjs /path/to/your-repo
-```
-
-Refresh the template from a building-blocks checkout (pack source after a
-change here):
-
-```bash
-node scripts/export-template.mjs /path/to/closed-loop-agents
+git clone https://github.com/leeran7/closed-loop-agents.git /tmp/cla
+node /tmp/cla/scripts/init-pack.mjs /path/to/your-repo
 ```
 
 There are three kinds of files:
 
-| Kind | Who edits | Copied by `init-pack`? |
-|------|-----------|------------------------|
-| **Pack** | Only when you change the agent system | Yes |
-| **Context** | You, in every consuming repo | Template only (never another product’s facts) |
-| **Generated** | Nobody — `yarn sync` rebuilds them | Rebuilt in the target |
+| Kind | Who edits | Where it lives |
+|------|-----------|-----------------|
+| **Package** | Only closed-loop-agents itself | `node_modules/closed-loop-agents/` (or vendored, in `init` mode) |
+| **Local override / addition** | You, per repo, when a role or skill needs to differ | Your repo's own `agents/`, `skills/`, `handoffs/schema.json` — same filename as the package's wins |
+| **Context** | You, in every consuming repo | `context/` — never copied from the package |
+| **Generated** | Nobody — `sync` rebuilds it | `.cursor/`, `.claude/`, `.codex/`, `.agents/` |
+
+## How `sync` resolves each file
+
+For every agent, skill, and the handoffs schema, `closed-loop-agents sync`
+looks in **your repo first**, then falls back to the package:
+
+- A file that exists **only in the package** → used as-is (a repo that adds
+  nothing gets every package default).
+- A file with the **same name in your repo** → your version wins entirely
+  (a customized `verifier.md`, a swapped-in `skills/my-skill/`, your own
+  `handoffs/schema.json` with extra fields your orchestrator needs).
+- A file that exists **only in your repo** → included too (a repo-specific
+  agent like `software-engineer.md`, or any skill unrelated to closed loop).
+
+Don't want every package agent synced (most repos won't run all of them)?
+Set `context/profile.json` `agentRoster` to the exact names you want:
+
+```json
+{ "agentRoster": ["software-engineer", "verifier", "reviewer", "security-reviewer", "qa-acceptance", "integrator"] }
+```
+
+Omit it and every agent name found (package ∪ your overrides) is synced.
 
 ## Tree after setup
 
 ```
 your-repo/
 │
-├── context/                      ← YOU. This repo’s facts. Agents only point here.
+├── context/                      ← YOU. This repo's facts. Agents only point here.
 │   ├── README.md                 index: what to read, in what order
-│   ├── profile.json              name, stack, package managers, paths
+│   ├── profile.json              name, stack, package managers, paths, agentRoster
 │   ├── gates.json                CI commands + how each was proven to fail
 │   ├── trust.md                  irreversible writes, money, secrets
 │   ├── git.md                    remote, default branch, PR vs trunk
 │   └── conventions.md            how to match this codebase
 │
 ├── loop/                         ← YOU (memory) + runtime (gitignored)
-│   ├── learnings.md              this repo’s ledger (version this)
+│   ├── learnings.md              this repo's ledger (version this)
 │   ├── learnings.jsonl           append-only events (version this)
 │   ├── handoffs/                 per-run; gitignored
 │   └── state.json                per-run; gitignored
 │
-├── agents/                       ← PACK. Generic roles. No product facts.
-│   ├── claude.config.json
-│   ├── orchestrator.md
-│   ├── product-spec.md
-│   ├── architect.md
-│   ├── implementer.md
-│   ├── verifier.md
-│   ├── reviewer.md
-│   ├── security-reviewer.md
-│   ├── qa-acceptance.md
-│   ├── integrator.md
-│   └── …specialists.md
+├── agents/                       ← OPTIONAL local overrides/additions only.
+│   ├── claude.config.json        Omit entirely to take every package default;
+│   └── my-custom-role.md         same filename as the package overrides it.
 │
-├── skills/closed-loop/           ← PACK. Protocol identical in every repo.
-│   ├── SKILL.md                  how to run the loop
-│   ├── protocol.md               prepended onto every agent at sync
-│   ├── gates.md                  kernel quality rules (not your CI list)
-│   ├── handoffs.md
-│   ├── team.md
-│   ├── stages.md
-│   ├── learning-loop.md
-│   ├── pack.md                   design of the pack
-│   └── host.md                   generic CLAUDE.md body
+├── skills/                       ← OPTIONAL local overrides/additions only.
+│   └── closed-loop/              Omit to take the package's closed-loop skill
+│       └── *.md                  as-is; add other skill dirs freely.
 │
-├── pack/                         ← PACK. Schemas, templates, this file.
-│   ├── SETUP.md                  ← you are here
-│   ├── MANIFEST.json
-│   ├── profile.schema.json
-│   ├── hygiene-rules.json
-│   └── templates/
-│       ├── context/              empty context/ for a new repo
-│       ├── learnings.md
-│       └── gitignore.snippet
+├── handoffs/schema.json          ← OPTIONAL. Present → wins over the package's.
 │
-├── scripts/
-│   ├── init-pack.mjs             vendor this pack into another repo
-│   ├── sync.mjs                  agents/ + skills/ → .cursor/ and .claude/
-│   └── hygiene.mjs               fail if a role file leaks product facts
+├── node_modules/closed-loop-agents/   ← THE PACKAGE (installed dependency).
+│   ├── agents/*.md, agents/claude.config.json
+│   ├── skills/closed-loop/*.md
+│   ├── handoffs/schema.json
+│   ├── orchestrator/              `closed-loop-agents loop "goal"` (Cursor SDK)
+│   ├── bin/cli.mjs                the `closed-loop-agents` command
+│   └── scripts/{sync,hygiene,init-pack,pack-copy}.mjs
 │
-├── orchestrator/                 ← PACK. `yarn loop "goal"` (Cursor SDK)
-├── handoffs/schema.json          ← PACK. Handoff JSON schema
-│
-├── .cursor/agents/               ← GENERATED. Do not edit.
-├── .cursor/skills/closed-loop/   ← GENERATED.
-├── .claude/agents/               ← GENERATED.
-└── .claude/skills/closed-loop/   ← GENERATED.
+├── .cursor/agents/                ← GENERATED. Do not edit.
+├── .claude/agents/                ← GENERATED.
+├── .codex/agents/                 ← GENERATED. TOML.
+├── .cursor/skills/, .claude/skills/, .agents/skills/  ← GENERATED, symlinked.
+├── .cursor/handoffs/, .claude/handoffs/               ← GENERATED, symlinked.
+├── .cursor/rules/                 ← GENERATED, symlinked from .claude/rules/ if present.
+└── AGENTS.md                      ← GENERATED, symlinked to CLAUDE.md if present.
 ```
 
 Product code (`app/`, libraries, DESIGN.md, etc.) stays wherever the host
@@ -114,33 +109,32 @@ live design file. **Do not copy tokens into `agents/`.**
 
 ## 5-minute install
 
-From a clone of the pack (this repo, or a future `closed-loop-agents` tree):
-
 ```bash
-node scripts/init-pack.mjs /path/to/your-repo
-cd /path/to/your-repo
+yarn add -D github:leeran7/closed-loop-agents#main
 ```
-
-`init-pack` copies the **pack** files, writes `context/` from templates if
-missing, writes an empty learnings ledger if missing, appends the gitignore
-snippet (ignore `loop/*`, keep the two ledger files), and runs `sync`.
 
 Then fill in **your** context — this is the only required human step:
 
-1. `context/profile.json` — package managers per path, stack, `paths.design`
+1. `context/profile.json` — package managers per path, stack, `paths.design`,
+   `agentRoster` if you don't want every package agent
 2. `context/gates.json` — real lint/test/typecheck commands, each with `proveFail`
-3. `context/trust.md` — this product’s money paths and irreversible writes
+3. `context/trust.md` — this product's money paths and irreversible writes
 4. `context/git.md` — remotes and branch policy
-5. `context/conventions.md` — “match this tree”
+5. `context/conventions.md` — "match this tree"
 
 ```bash
-node scripts/sync.mjs
-yarn --cwd orchestrator install
-yarn --cwd orchestrator test
+npx closed-loop-agents sync
+yarn --cwd node_modules/closed-loop-agents/orchestrator install
+npx closed-loop-agents loop "smoke test"
 ```
 
 Invoke `@orchestrator` (Cursor), `/closed-loop` (Claude Code), or
-`yarn loop "Build …"` with `CURSOR_API_KEY`.
+`closed-loop-agents loop "Build …"` (`CURSOR_API_KEY`).
+
+If your repo needs its own customized orchestrator (product-specific gating
+logic beyond the generic pipeline), keep a local `orchestrator/` — a repo
+that has one should point its own `loop` script at it instead of the
+package's.
 
 ## What agents read (in order)
 
@@ -158,27 +152,28 @@ loop/learnings.md →  what this product already burned itself on
 If `context/` is missing, agents infer from lockfiles and existing code.
 They still must not invent a second stack.
 
-## Do not copy from the pack repo
+## Do not copy from the package
 
 | Leave behind | Why |
 |--------------|-----|
 | `app/` | Product |
-| `context/` from this repo | Another product’s trust/git/stack |
+| `context/` from this repo | Another product's trust/git/stack |
 | `loop/learnings.md` body | Lava, Stripe-altitude, this game |
-| `CLAUDE.md` as-is | Host overlay; `init-pack` writes `host.md` only if absent |
+| `CLAUDE.md` as-is | Host overlay |
 | `closed-loop.profile.json` | Replaced by `context/profile.json` |
 
 ## After install: commands
 
 | Command | What |
 |---------|------|
-| `node scripts/sync.mjs` | Rebuild platform agents; runs hygiene first |
-| `node scripts/hygiene.mjs` | Fail if `agents/*.md` contain product leakage or omit `context/README.md` |
-| `yarn loop "…"` | Programmatic closed loop |
-| Edit `agents/` or `skills/` | Then `sync` again |
+| `npx closed-loop-agents sync` | Rebuild platform agents/skills/handoffs; runs hygiene on the package first |
+| `npx closed-loop-agents hygiene` | Fail if this package's own `agents/*.md` leak product facts, omit `context/README.md`, or exceed `maxAgentLines` |
+| `npx closed-loop-agents loop "…"` | Programmatic closed loop (bundled orchestrator) |
+| `npx closed-loop-agents init /path` | Vendor a full copy instead of depending on the package |
+| Edit local `agents/` or `skills/` | Then `sync` again |
 
-## File map (pack vs context)
+## File map (package vs context)
 
-See `pack/MANIFEST.json` `kernel` (copied) and `doNotCopy` (never copied).
-Schema for `context/profile.json`: `pack/profile.schema.json`.
-Design of layers: `skills/closed-loop/pack.md`.
+See `pack/MANIFEST.json` `kernel` (what ships in the package) and
+`doNotCopy` (never copied by `init`). Schema for `context/profile.json`:
+`pack/profile.schema.json`. Design of layers: `skills/closed-loop/pack.md`.

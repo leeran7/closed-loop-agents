@@ -64,13 +64,14 @@ from layers 1–2 and points at 3–4.
 
 ## What travels vs what stays
 
-**Pack (copy into another repo):**
+**Pack (published as the `closed-loop-agents` npm package; this repo is its
+source):**
 
 - `agents/*.md` and `agents/claude.config.json`
 - `skills/closed-loop/*.md`
 - `handoffs/schema.json`
 - `pack/` (schemas, templates, manifest)
-- `scripts/sync.mjs`, `scripts/init-pack.mjs`, `scripts/export-template.mjs`, `scripts/hygiene.mjs`
+- `bin/cli.mjs`, `scripts/sync.mjs`, `scripts/init-pack.mjs`, `scripts/hygiene.mjs`
 - `orchestrator/` (the programmatic loop)
 
 **Consuming repo (never copied from here as "the pack"):**
@@ -85,22 +86,23 @@ from layers 1–2 and points at 3–4.
 
 **Canonical steps and file tree:** [`pack/SETUP.md`](pack/SETUP.md).
 
-From a pack clone ([closed-loop-agents](https://github.com/leeran7/closed-loop-agents)
-or this tree):
+Add the package as a dependency and generate the platform files:
 
 ```bash
-node scripts/init-pack.mjs /path/to/other-repo
+yarn add -D github:leeran7/closed-loop-agents#main
+npx closed-loop-agents sync
 ```
 
-That vendors the pack, writes `context/` from `pack/templates/context/` if
-missing, writes an empty ledger, appends the gitignore snippet, and runs
-sync. Then edit **your** `context/` — not `agents/`.
+`sync` reads this package's `agents/` and `skills/closed-loop/` as defaults;
+a same-named file in **your** repo's own `agents/` or `skills/` overrides or
+extends it (a customized role, a swapped-in skill, your own
+`handoffs/schema.json`). Set `context/profile.json` `agentRoster` to the
+exact agent names your repo wants if you don't want every generic role
+synced. Then edit **your** `context/` — not this package's `agents/`.
 
-Refresh the template repo from a product checkout:
-
-```bash
-node scripts/export-template.mjs /path/to/closed-loop-agents
-```
+Offline / can't take a package dependency? `npx closed-loop-agents init
+/path/to/other-repo` vendors a full copy instead (legacy mode — you own
+keeping it in sync by hand from then on).
 
 Do **not** copy this repo's `loop/learnings.md` body or filled-in
 `context/`. Other products inherit `skills/closed-loop/gates.md`, not

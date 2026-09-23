@@ -1,18 +1,30 @@
 #!/usr/bin/env node
-import { readFile, writeFile, mkdir, readdir, cp } from "node:fs/promises";
-import { join, dirname } from "node:path";
+/**
+ * Generate .cursor/, .claude/, .codex/, and .agents/ from the closed-loop
+ * kernel (this package's agents/, skills/, handoffs/) plus a consuming
+ * repo's own overrides.
+ *
+ * Source resolution (per file/dir):
+ *   1. TARGET_ROOT/<path>  — if it exists, it wins (a repo's local override
+ *      or addition: a customized agent, a swapped-in skill, its own
+ *      handoffs/schema.json).
+ *   2. PACKAGE_ROOT/<path> — this package's default.
+ *
+ * When invoked with no target (pack development, `node scripts/sync.mjs`
+ * from a checkout of this repo), TARGET_ROOT === PACKAGE_ROOT and step 1
+ * always wins trivially — same behavior as before this file supported a
+ * separate target.
+ */
+import { readFile, writeFile, mkdir, readdir, symlink, unlink, lstat, rm, access } from "node:fs/promises";
+import { join, dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const AGENTS_SRC = join(ROOT, "agents");
-const SKILLS_SRC = join(ROOT, "skills");
-const CLAUDE_CONFIG_PATH = join(AGENTS_SRC, "claude.config.json");
-const PROTOCOL_PATH = join(SKILLS_SRC, "closed-loop", "protocol.md");
+const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const PATH_REPLACEMENTS = [
-  [/.cursor\/loop/g, "loop"],
-  [/.cursor\/skills\/closed-loop/g, "skills/closed-loop"],
-  [/.cursor\/handoffs/g, "handoffs"],
+  [/\.cursor\/loop/g, "loop"],
+  [/\.cursor\/skills\//g, "skills/"],
+  [/\.cursor\/handoffs/g, "handoffs"],
 ];
 
 function neutralizePaths(text) {
@@ -21,6 +33,26 @@ function neutralizePaths(text) {
     result = result.replace(pattern, replacement);
   }
   return result;
+}
+
+async function exists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureSymlink(target, linkPath) {
+  try {
+    const st = await lstat(linkPath);
+    if (st.isDirectory() && !st.isSymbolicLink()) await rm(linkPath, { recursive: true });
+    else await unlink(linkPath);
+  } catch {
+    /* nothing there yet */
+  }
+  await symlink(target, linkPath);
 }
 
 function splitAgentFile(content) {
@@ -32,6 +64,20 @@ function splitAgentFile(content) {
 function extractName(frontmatterRaw) {
   const match = frontmatterRaw.match(/^name:\s*(.+)$/m);
   return match?.[1]?.trim();
+}
+
+function extractDescription(frontmatterRaw) {
+  const single = frontmatterRaw.match(/^description:\s+(.+)$/m);
+  if (single && !single[1].startsWith(">")) return single[1].trim();
+  const folded = frontmatterRaw.match(/^description:\s*>-?\n((?:[ \t]+.*\n?)*)/m);
+  if (!folded) return "";
+  return folded[1].replace(/\n\s*/g, " ").trim();
+}
+
+function toCodexToml(name, description, composedBody) {
+  const trimmed = composedBody.replace(/\n+$/, "");
+  const escaped = trimmed.replaceAll("\\", "\\\\").replaceAll('"""', '\\"\\"\\"');
+  return `name = ${JSON.stringify(name)}\ndescription = ${JSON.stringify(description)}\ndeveloper_instructions = """\n${escaped}"""\n`;
 }
 
 function buildClaudeFrontmatter(frontmatterRaw, claudeConfig) {
@@ -67,26 +113,81 @@ function prependProtocol(body, protocolBody) {
 
 async function runHygiene() {
   const { lintAgents } = await import("./hygiene.mjs");
-  const { filesChecked, violations } = await lintAgents(ROOT);
+  const { filesChecked, violations } = await lintAgents(PACKAGE_ROOT);
   if (violations.length > 0) {
     const detail = violations.map((v) => `${v.file}: ${v.needle}`).join("\n  ");
     throw new Error(`Pack hygiene failed (${violations.length}/${filesChecked}):\n  ${detail}`);
   }
 }
 
-async function syncAgents(claudeConfig, protocolBody) {
-  const files = (await readdir(AGENTS_SRC)).filter((f) => f.endsWith(".md"));
+// --- source resolution: package defaults, overridden/extended by a target repo's local files ---
 
-  await mkdir(join(ROOT, ".cursor", "agents"), { recursive: true });
-  await mkdir(join(ROOT, ".claude", "agents"), { recursive: true });
+async function listMdFiles(dir) {
+  if (!(await exists(dir))) return [];
+  return (await readdir(dir)).filter((f) => f.endsWith(".md"));
+}
 
-  for (const file of files) {
-    const raw = neutralizePaths(await readFile(join(AGENTS_SRC, file), "utf-8"));
+async function resolveAgentSources(targetRoot) {
+  const packageAgentsDir = join(PACKAGE_ROOT, "agents");
+  const localAgentsDir = join(targetRoot, "agents");
+  const isOverlay = resolve(targetRoot) !== resolve(PACKAGE_ROOT);
+
+  const byName = new Map();
+  for (const file of await listMdFiles(packageAgentsDir)) byName.set(file, join(packageAgentsDir, file));
+  if (isOverlay) {
+    for (const file of await listMdFiles(localAgentsDir)) byName.set(file, join(localAgentsDir, file));
+  }
+
+  let names = [...byName.keys()];
+
+  const profilePath = join(targetRoot, "context", "profile.json");
+  if (await exists(profilePath)) {
+    const profile = JSON.parse(await readFile(profilePath, "utf-8"));
+    if (Array.isArray(profile.agentRoster) && profile.agentRoster.length) {
+      const roster = new Set(profile.agentRoster.map((n) => (n.endsWith(".md") ? n : `${n}.md`)));
+      names = names.filter((f) => roster.has(f));
+    }
+  }
+
+  return names.sort().map((file) => ({ file, path: byName.get(file) }));
+}
+
+async function resolveClaudeConfig(targetRoot) {
+  const packagePath = join(PACKAGE_ROOT, "agents", "claude.config.json");
+  const localPath = join(targetRoot, "agents", "claude.config.json");
+  const isOverlay = resolve(targetRoot) !== resolve(PACKAGE_ROOT);
+  const source = isOverlay && (await exists(localPath)) ? localPath : packagePath;
+  return { config: JSON.parse(await readFile(source, "utf-8")), source };
+}
+
+function resolveSkillsSourceDirs(targetRoot) {
+  const isOverlay = resolve(targetRoot) !== resolve(PACKAGE_ROOT);
+  const dirs = [join(PACKAGE_ROOT, "skills")];
+  if (isOverlay) dirs.push(join(targetRoot, "skills"));
+  return dirs;
+}
+
+async function resolveHandoffsSchema(targetRoot) {
+  const packagePath = join(PACKAGE_ROOT, "handoffs", "schema.json");
+  const localPath = join(targetRoot, "handoffs", "schema.json");
+  const isOverlay = resolve(targetRoot) !== resolve(PACKAGE_ROOT);
+  return isOverlay && (await exists(localPath)) ? localPath : packagePath;
+}
+
+// --- sync steps ---
+
+async function syncAgents(targetRoot, protocolBody) {
+  const { config: claudeConfig, source: claudeConfigSrc } = await resolveClaudeConfig(targetRoot);
+  const sources = await resolveAgentSources(targetRoot);
+
+  await mkdir(join(targetRoot, ".claude", "agents"), { recursive: true });
+  await mkdir(join(targetRoot, ".cursor", "agents"), { recursive: true });
+  await mkdir(join(targetRoot, ".codex", "agents"), { recursive: true });
+
+  for (const { file, path } of sources) {
+    const raw = neutralizePaths(await readFile(path, "utf-8"));
     const { frontmatterRaw, body } = splitAgentFile(raw);
     const composed = prependProtocol(body, protocolBody);
-
-    const cursorOut = `---\n${frontmatterRaw}\n---\n${composed}`;
-    await writeFile(join(ROOT, ".cursor", "agents", file), cursorOut);
 
     const agentName = extractName(frontmatterRaw) ?? file.replace(".md", "");
     const config = claudeConfig[agentName] ?? {
@@ -95,48 +196,102 @@ async function syncAgents(claudeConfig, protocolBody) {
     };
     const claudeFrontmatter = buildClaudeFrontmatter(frontmatterRaw, config);
     const claudeOut = `---\n${claudeFrontmatter}\n---\n${composed}`;
-    await writeFile(join(ROOT, ".claude", "agents", file), claudeOut);
+    await writeFile(join(targetRoot, ".claude", "agents", file), claudeOut);
+
+    // Cursor: symlink to the Claude agent (Cursor ignores extra frontmatter)
+    await ensureSymlink(
+      relative(join(targetRoot, ".cursor", "agents"), join(targetRoot, ".claude", "agents", file)),
+      join(targetRoot, ".cursor", "agents", file),
+    );
+
+    // Codex: TOML format (no symlink possible)
+    const description = extractDescription(frontmatterRaw);
+    const tomlOut = toCodexToml(agentName, description, composed);
+    await writeFile(join(targetRoot, ".codex", "agents", file.replace(".md", ".toml")), tomlOut);
   }
 
-  console.log(`Synced ${files.length} agents → .cursor/agents/ and .claude/agents/ (protocol prepended)`);
+  // claude.config.json: symlink from .claude/agents/ to whichever copy won (local or package)
+  await ensureSymlink(
+    relative(join(targetRoot, ".claude", "agents"), claudeConfigSrc),
+    join(targetRoot, ".claude", "agents", "claude.config.json"),
+  );
+
+  console.log(
+    `Synced ${sources.length} agents → .claude/agents/ (generated), .cursor/agents/ (symlinked), .codex/agents/ (TOML)`,
+  );
 }
 
-async function syncSkills() {
-  const skillDir = join(SKILLS_SRC, "closed-loop");
-  const cursorDest = join(ROOT, ".cursor", "skills", "closed-loop");
-  const claudeDest = join(ROOT, ".claude", "skills", "closed-loop");
-
-  await mkdir(cursorDest, { recursive: true });
-  await mkdir(claudeDest, { recursive: true });
-
-  for (const file of await readdir(skillDir)) {
-    const neutral = neutralizePaths(await readFile(join(skillDir, file), "utf-8"));
-    await writeFile(join(cursorDest, file), neutral);
-    await writeFile(join(claudeDest, file), neutral);
+async function syncSkills(targetRoot) {
+  const srcDirs = resolveSkillsSourceDirs(targetRoot);
+  const byName = new Map();
+  for (const srcRoot of srcDirs) {
+    if (!(await exists(srcRoot))) continue;
+    for (const entry of await readdir(srcRoot, { withFileTypes: true })) {
+      if (entry.isDirectory()) byName.set(entry.name, join(srcRoot, entry.name));
+    }
   }
 
-  console.log("Synced skills/closed-loop → .cursor/skills/ and .claude/skills/");
+  const targets = [
+    join(targetRoot, ".cursor", "skills"),
+    join(targetRoot, ".claude", "skills"),
+    join(targetRoot, ".agents", "skills"),
+  ];
+
+  for (const [name, srcDir] of byName) {
+    for (const dest of targets) {
+      await mkdir(dest, { recursive: true });
+      const linkPath = join(dest, name);
+      await ensureSymlink(relative(dest, srcDir), linkPath);
+    }
+  }
+
+  console.log(`Synced ${byName.size} skill pack(s) → .cursor/skills/, .claude/skills/, .agents/skills/ (symlinked)`);
 }
 
-async function syncHandoffsSchema() {
-  const src = join(ROOT, "handoffs", "schema.json");
-  await mkdir(join(ROOT, ".cursor", "handoffs"), { recursive: true });
-  await mkdir(join(ROOT, ".claude", "handoffs"), { recursive: true });
-  await cp(src, join(ROOT, ".cursor", "handoffs", "schema.json"));
-  await cp(src, join(ROOT, ".claude", "handoffs", "schema.json"));
-  console.log("Synced handoffs/schema.json");
+async function syncHandoffsSchema(targetRoot) {
+  const src = await resolveHandoffsSchema(targetRoot);
+  const targets = [join(targetRoot, ".cursor", "handoffs"), join(targetRoot, ".claude", "handoffs")];
+  for (const dest of targets) {
+    await mkdir(dest, { recursive: true });
+    await ensureSymlink(relative(dest, src), join(dest, "schema.json"));
+  }
+  console.log("Synced handoffs/schema.json (symlinked)");
 }
 
-async function main() {
+async function syncRules(targetRoot) {
+  const rulesDir = join(targetRoot, ".claude", "rules");
+  if (!(await exists(rulesDir))) return;
+  const entries = await readdir(rulesDir);
+  if (entries.length === 0) return;
+  const cursorRules = join(targetRoot, ".cursor", "rules");
+  await mkdir(cursorRules, { recursive: true });
+  for (const file of entries) {
+    await ensureSymlink(relative(cursorRules, join(rulesDir, file)), join(cursorRules, file));
+  }
+  console.log(`Synced ${entries.length} rule(s) → .cursor/rules/ (symlinked)`);
+}
+
+async function syncAgentsMd(targetRoot) {
+  if (!(await exists(join(targetRoot, "CLAUDE.md")))) return;
+  await ensureSymlink("CLAUDE.md", join(targetRoot, "AGENTS.md"));
+  console.log("Synced CLAUDE.md → AGENTS.md (symlinked)");
+}
+
+export async function sync(targetRoot = process.cwd()) {
+  targetRoot = resolve(targetRoot);
   await runHygiene();
-  const claudeConfig = JSON.parse(await readFile(CLAUDE_CONFIG_PATH, "utf-8"));
-  const protocolBody = await readFile(PROTOCOL_PATH, "utf-8");
-  await syncAgents(claudeConfig, protocolBody);
-  await syncSkills();
-  await syncHandoffsSchema();
+  const protocolBody = await readFile(join(PACKAGE_ROOT, "skills", "closed-loop", "protocol.md"), "utf-8");
+  await syncAgents(targetRoot, protocolBody);
+  await syncSkills(targetRoot);
+  await syncHandoffsSchema(targetRoot);
+  await syncRules(targetRoot);
+  await syncAgentsMd(targetRoot);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isDirect = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isDirect) {
+  sync(process.argv[2]).catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
