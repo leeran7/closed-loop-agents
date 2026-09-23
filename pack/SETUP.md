@@ -167,7 +167,7 @@ They still must not invent a second stack.
 | Command | What |
 |---------|------|
 | `npx closed-loop-agents sync` | Rebuild platform agents/skills/handoffs; runs hygiene on the package first |
-| `npx closed-loop-agents hygiene` | Fail if this package's own `agents/*.md` leak product facts, omit `context/README.md`, or exceed `maxAgentLines` |
+| `npx closed-loop-agents hygiene` | Fail if `agents/*.md` leak product facts, omit `context/README.md`, or exceed `maxAgentLines`. Lints **your repo's own** `agents/` if you keep a local `pack/hygiene-rules.json` (copy `pack/hygiene-rules.json` from the package and add your own banned strings); otherwise lints the package's own generic agents. |
 | `npx closed-loop-agents loop "…"` | Programmatic closed loop (bundled orchestrator) |
 | `npx closed-loop-agents init /path` | Vendor a full copy instead of depending on the package |
 | Edit local `agents/` or `skills/` | Then `sync` again |

@@ -24,8 +24,10 @@ Commands:
                            handoffs schema in target-dir (default: cwd). Reads this
                            package's agents/skills as defaults; a same-named file
                            in target-dir/agents or target-dir/skills overrides it.
-  hygiene                  Lint this package's own agents/*.md for leaked product
-                           facts and oversized role files (run before publishing).
+  hygiene [target-dir]     Lint agents/*.md for leaked product facts and oversized
+                           role files. Lints target-dir (default: cwd) if it has its
+                           own agents/ + pack/hygiene-rules.json local override,
+                           else falls back to this package's own agents/.
   init <target-dir>        Vendor a full copy of the pack into target-dir — for
                            repos that can't take a package dependency. Prefer
                            installing this package + \`sync\` instead.
@@ -56,9 +58,17 @@ async function main() {
       await sync(target);
       return;
     }
-    case "hygiene":
-      await run("node", [join(PACKAGE_ROOT, "scripts", "hygiene.mjs")], process.cwd());
+    case "hygiene": {
+      const { runCli } = await import("../scripts/hygiene.mjs");
+      const target = rest[0] ? resolve(process.cwd(), rest[0]) : process.cwd();
+      const { access } = await import("node:fs/promises");
+      const hasLocalRules = await access(join(target, "pack", "hygiene-rules.json")).then(
+        () => true,
+        () => false,
+      );
+      await runCli(hasLocalRules ? target : PACKAGE_ROOT);
       return;
+    }
     case "init": {
       const dest = rest[0];
       if (!dest) {
