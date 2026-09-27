@@ -1,7 +1,6 @@
 {
   "name": "closed-loop-agents",
   "version": "1.0.0",
-  "private": true,
   "description": "Reusable closed-loop agent pack. Install as a dependency, run `npx closed-loop-agents sync`, then fill in context/ for your repo. See pack/SETUP.md.",
   "type": "module",
   "engines": {
