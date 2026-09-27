@@ -1,8 +1,8 @@
 # Closed-loop host instructions
 
-Generic body for `CLAUDE.md` / `AGENTS.md`. `init-pack` writes this when
-those files do not already exist. Product facts belong in `context/`, not
-here.
+Generic body for `CLAUDE.md` / `AGENTS.md`. `init-pack` (vendor mode) writes
+this when those files do not already exist. Product facts belong in
+`context/`, not here.
 
 **New repo?** Start at [`pack/SETUP.md`](pack/SETUP.md) (file tree +
 5-minute install).
@@ -16,9 +16,12 @@ here.
 | Protocol | `skills/closed-loop/protocol.md` |
 | Kernel gates | `skills/closed-loop/gates.md` |
 | Memory | `loop/learnings.md` + `loop/learnings.jsonl` |
-| Roles | `agents/*.md` (sync to `.cursor/agents/` and `.claude/agents/`) |
+| Roles | `agents/*.md` (sync to `.cursor/`, `.claude/`, `.codex/`) |
 
-Edit `agents/` or `skills/`, then run `node scripts/sync.mjs`.
+Roles and the closed-loop skill come from the `closed-loop-agents` package
+(`node_modules/closed-loop-agents`); this repo's own `agents/` and
+`skills/` hold only local overrides or additions. Edit either, then run
+`npx closed-loop-agents sync`.
 
 ## Agent review is mandatory
 
@@ -58,4 +61,4 @@ missing handoff is **failed**. After verifier: `reviewer` and
 
 - Cursor: `@orchestrator` or the closed-loop skill
 - Claude Code: `/closed-loop`
-- Programmatic: `yarn loop "…"` (`CURSOR_API_KEY`)
+- Programmatic: `npx closed-loop-agents loop "…"` (`CURSOR_API_KEY`)

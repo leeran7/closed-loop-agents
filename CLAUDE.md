@@ -16,9 +16,13 @@ here.
 | Protocol | `skills/closed-loop/protocol.md` |
 | Kernel gates | `skills/closed-loop/gates.md` |
 | Memory | `loop/learnings.md` + `loop/learnings.jsonl` |
-| Roles | `agents/*.md` (sync to `.cursor/agents/` and `.claude/agents/`) |
+| Roles | `agents/*.md` (sync to `.cursor/`, `.claude/`, `.codex/`) |
 
-Edit `agents/` or `skills/`, then run `node scripts/sync.mjs`.
+This repo **is** the `closed-loop-agents` package — other repos install it
+as a dependency (`yarn add -D github:leeran7/closed-loop-agents#main`) and
+run `npx closed-loop-agents sync`. Edit `agents/` or `skills/` here, then
+run `node scripts/sync.mjs` to regenerate this repo's own `.cursor/`/
+`.claude/`/`.codex/` and `node scripts/hygiene.mjs` before committing.
 
 ## Agent review is mandatory
 

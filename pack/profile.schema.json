@@ -41,6 +41,11 @@
     "requiredTeam": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "agentRoster": {
+      "description": "Restricts which agents `closed-loop-agents sync` generates for this repo, by name (without .md), drawn from this package's agents/ plus this repo's own agents/ overrides and additions. Omit to sync every agent name found in either.",
+      "type": "array",
+      "items": { "type": "string" }
     }
   }
 }

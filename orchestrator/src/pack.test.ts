@@ -45,7 +45,8 @@ describe("pack hygiene", () => {
     assert.match(setup, /building-blocks/);
     assert.match(setup, /context\//);
     assert.match(setup, /init-pack/);
-    assert.match(setup, /export-template/);
+    assert.match(setup, /closed-loop-agents sync/);
+    assert.match(setup, /agentRoster/);
   });
 
   it("fixLoopGitignore rewrites loop/ so learnings are not ignored", async () => {

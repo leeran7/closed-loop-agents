@@ -1,14 +1,16 @@
 {
   "name": "closed-loop-agents",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "description": "Reusable closed-loop agent pack. Product code (app/) is not in this manifest.",
   "kernel": [
     "agents/*.md",
+    "agents/*/*.md",
     "agents/claude.config.json",
     "skills/closed-loop/*.md",
     "handoffs/schema.json",
     "pack/**",
     "scripts/*.mjs",
+    "bin/*.mjs",
     "orchestrator/package.json",
     "orchestrator/tsconfig.json",
     "orchestrator/tsconfig.test.json",

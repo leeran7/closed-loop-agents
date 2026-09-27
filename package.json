@@ -1,7 +1,29 @@
 {
   "name": "closed-loop-agents",
+  "version": "1.0.0",
   "private": true,
-  "description": "Reusable closed-loop agent pack. Fill in context/ for your repo. See pack/SETUP.md.",
+  "description": "Reusable closed-loop agent pack. Install as a dependency, run `npx closed-loop-agents sync`, then fill in context/ for your repo. See pack/SETUP.md.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "closed-loop-agents": "bin/cli.mjs"
+  },
+  "files": [
+    "agents",
+    "skills/closed-loop",
+    "handoffs/schema.json",
+    "pack",
+    "scripts",
+    "bin",
+    "orchestrator/package.json",
+    "orchestrator/tsconfig.json",
+    "orchestrator/tsconfig.test.json",
+    "orchestrator/src",
+    "orchestrator/yarn.lock",
+    "README.md"
+  ],
   "scripts": {
     "sync": "node scripts/sync.mjs",
     "hygiene": "node scripts/hygiene.mjs",

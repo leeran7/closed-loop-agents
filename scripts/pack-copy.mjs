@@ -82,11 +82,6 @@ export async function purgeDoNotCopy(destRoot, manifest) {
   }
 }
 
-export async function resetAgentsAndSkills(destRoot) {
-  await rm(join(destRoot, "agents"), { recursive: true, force: true });
-  await rm(join(destRoot, "skills", "closed-loop"), { recursive: true, force: true });
-}
-
 /**
  * Rewrite a directory ignore of loop/ or loop/** to loop/* plus ledger negations.
  */
