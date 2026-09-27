@@ -68,10 +68,11 @@ function extractName(frontmatterRaw) {
 
 function extractDescription(frontmatterRaw) {
   const single = frontmatterRaw.match(/^description:\s+(.+)$/m);
-  if (single && !single[1].startsWith(">")) return single[1].trim();
-  const folded = frontmatterRaw.match(/^description:\s*>-?\n((?:[ \t]+.*\n?)*)/m);
-  if (!folded) return "";
-  return folded[1].replace(/\n\s*/g, " ").trim();
+  if (single && !/^[|>]/.test(single[1])) return single[1].trim();
+  // Folded (`>`) or literal (`|`) block scalar, either chomped (`-`) or not.
+  const block = frontmatterRaw.match(/^description:\s*[|>]-?\n((?:[ \t]+.*\n?)*)/m);
+  if (!block) return "";
+  return block[1].replace(/\n\s*/g, " ").trim();
 }
 
 function toCodexToml(name, description, composedBody) {

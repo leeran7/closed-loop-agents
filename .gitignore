@@ -1,9 +1,10 @@
 # Closed-loop runtime (pack gitignore snippet)
-# Ignore per-run artifacts. Re-include learnings.md (open questions only)
-# and handoffs/ (orchestrator retro promotes findings to permanent docs).
+# Ignore per-run artifacts. Re-include learnings.md (open questions only).
+# Handoff JSONs are transient scratch — the orchestrator retro promotes
+# their findings into docs/agents/skills, so nothing durable is lost by
+# not tracking them.
 loop/*
 !loop/learnings.md
-!loop/handoffs/
 !loop/*.md
 .cursor/loop/handoffs/*.json
 .cursor/loop/state.json
