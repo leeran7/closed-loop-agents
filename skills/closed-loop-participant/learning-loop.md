@@ -1,1 +1,1 @@
-/home/user/building-blocks/skills/closed-loop/learning-loop.md
+../closed-loop/learning-loop.md

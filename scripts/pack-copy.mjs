@@ -64,7 +64,14 @@ export async function copyKernel(packRoot, destArg) {
     }
     if (!info.isFile()) continue;
     await mkdir(dirname(out), { recursive: true });
-    await cp(src, out);
+    // verbatimSymlinks: true — otherwise Node's fs.cp "resolves" a relative
+    // symlink target into an absolute path rooted at packRoot, so a copied
+    // skill like closed-loop-participant/handoffs.md -> ../closed-loop/
+    // handoffs.md silently turns into an absolute path back into the
+    // *source* checkout (works by accident on the machine that ran the
+    // export, breaks everywhere else — the exact opposite of "the pack
+    // owns its own skills").
+    await cp(src, out, { verbatimSymlinks: true });
   }
 
   return { destRoot, manifest };

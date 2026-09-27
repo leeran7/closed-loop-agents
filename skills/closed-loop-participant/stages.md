@@ -1,1 +1,1 @@
-/home/user/building-blocks/skills/closed-loop/stages.md
+../closed-loop/stages.md

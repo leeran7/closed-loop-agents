@@ -1,1 +1,1 @@
-/home/user/building-blocks/skills/closed-loop/handoffs.md
+../closed-loop/handoffs.md
