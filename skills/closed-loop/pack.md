@@ -17,7 +17,7 @@ Everything lived in one blob:
 
 | Mixed in | Example | Breaks reuse because |
 |----------|---------|----------------------|
-| Protocol | Learning loop + handoff JSON copied into all 22 agents | Drift; 20–30% of each file is identical |
+| Protocol | Learning loop + handoff JSON copied into all agents | Drift; 20–30% of each file is identical |
 | Role | "You are the verifier" | This *should* travel |
 | Product | Tower Dark Editorial tokens, `#00d4ff`, BlockRow | Wrong the moment the design system moves |
 | Host policy | `git push building-blocks main`, dual remotes | Other repos have different git |
@@ -31,7 +31,7 @@ Two concrete failures in this repo:
    live design file does not.
 2. **Standing rules had nowhere to go except longer agents.** The Aug 29
    review proposed pasting new bullets into `verifier.md`, `reviewer.md`,
-   and `implementer.md`. Those lessons already belong in the ledger. Kernel
+   and `software-engineer.md`. Those lessons already belong in the ledger. Kernel
    lessons now graduate to `gates.md`. Product lessons stay in the repo
    ledger. Agent files stop growing.
 
@@ -39,17 +39,18 @@ Two concrete failures in this repo:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  4. MEMORY     loop/learnings.md + learnings.jsonl              │
-│                Per-repo. Version the ledger, gitignore the rest │
-│                of loop/. Product-specific. Never ships in pack. │
+│  4. MEMORY     loop/learnings.md (open questions only)          │
+│                Per-repo. Version it, gitignore the rest of      │
+│                loop/. Product-specific. Never ships in pack.    │
 ├─────────────────────────────────────────────────────────────────┤
 │  3. CONTEXT    context/                                         │
 │                Per-repo folder: profile, gates, trust, git,     │
 │                conventions. Schema: pack/profile.schema.json    │
 ├─────────────────────────────────────────────────────────────────┤
-│  2. ROLES      agents/*.md                                      │
+│  2. ROLES      agents/*.md (+ agents/<role>/*.md partials)    │
 │                Kernel. Identity + unique workflow + hard rules. │
 │                No protocol copy, no product hex, no "use pnpm". │
+│                Each file ≤ 200 lines — split and reference.     │
 ├─────────────────────────────────────────────────────────────────┤
 │  1. KERNEL     skills/closed-loop/{protocol,gates,handoffs,     │
 │                team,stages,learning-loop,SKILL}.md              │
@@ -68,7 +69,7 @@ from layers 1–2 and points at 3–4.
 source):**
 
 - `agents/*.md` and `agents/claude.config.json`
-- `skills/closed-loop/*.md`
+- `skills/` (`closed-loop/*.md` plus every reusable skill pack)
 - `handoffs/schema.json`
 - `pack/` (schemas, templates, manifest)
 - `bin/cli.mjs`, `scripts/sync.mjs`, `scripts/init-pack.mjs`, `scripts/hygiene.mjs`
@@ -78,7 +79,7 @@ source):**
 
 - `app/` and any product code
 - `context/` (write from `pack/templates/context/`)
-- `loop/learnings.md` + `loop/learnings.jsonl`
+- `loop/learnings.md` (open questions only)
 - Host git policy, remotes, trunk vs PR
 - `CLAUDE.md` / `AGENTS.md` once customized
 
@@ -93,8 +94,8 @@ yarn add -D github:leeran7/closed-loop-agents#main
 npx closed-loop-agents sync
 ```
 
-`sync` reads this package's `agents/` and `skills/closed-loop/` as defaults;
-a same-named file in **your** repo's own `agents/` or `skills/` overrides or
+`sync` reads this package's `agents/` and `skills/` as defaults; a
+same-named file in **your** repo's own `agents/` or `skills/` overrides or
 extends it (a customized role, a swapped-in skill, your own
 `handoffs/schema.json`). Set `context/profile.json` `agentRoster` to the
 exact agent names your repo wants if you don't want every generic role
@@ -110,9 +111,10 @@ product memory.
 
 ## Runtime: how an agent sees the layers
 
-1. **Cursor / Claude Code** — platform agent file = protocol (prepended by
-   sync) + role body. Skills live under `.cursor/skills/closed-loop/` or
-   `.claude/skills/closed-loop/`. The agent reads `context/` and the ledger.
+1. **Cursor / Claude Code / Codex** — platform agent file = protocol (prepended by
+   sync) + role body. Skills live under `.cursor/skills/`, `.claude/skills/`,
+   and `.agents/skills/` (symlinked by sync). The agent reads `context/` and
+   the ledger.
 2. **`yarn loop`** — `buildStagePrompt` wraps goal, **repo `context/`**,
    prior handoff, and learnings as untrusted data, then the role body.
 
@@ -122,16 +124,18 @@ Either path: missing handoff file → stage **failed**.
 
 | Kind | Lives in | Example |
 |------|----------|---------|
-| Product | `loop/learnings.md` | Power-up stacking vs one slot; `canvas.width` clears the bitmap |
-| Kernel | `skills/closed-loop/gates.md` | Prove a gate fails; never grep-assert behaviour |
+| Product-specific | `context/conventions.md` | Auth effects gate on loading; canvas width clears bitmap |
+| Kernel-generic | `skills/closed-loop/gates.md` | Prove a gate fails; never grep-assert behaviour |
 | Role invariant | that agent's `## Hard rules` | Verifier does not fix production code |
+| Auto-loaded rules | `.claude/rules/*.md` | Distilled gates for every conversation |
 
-Promote a ledger standing rule into `gates.md` only when it is
-product-agnostic **and** either seen in two repos or independently found
-by two agents with `forAgents: ["all"]`. That is a pack change, not a
-drive-by edit of 22 agent files.
+Learnings follow a **promote-then-prune** pipeline: the orchestrator retro
+routes each finding to its permanent file (see `learning-loop.md`) and
+prunes it. `loop/learnings.md` holds only open questions.
 
-Do not paste kernel gates back into every agent. Point at `gates.md`.
+Do not paste kernel gates back into every agent. Point at `gates.md`. Keep each
+`agents/` markdown file under 200 lines; split into `agents/<role>/*.md` partials
+and reference them instead of growing the entry file.
 
 ## Quality gates in the profile
 
@@ -140,26 +144,44 @@ lint` with no ESLint config exited 0). Each `context/gates.json`
 `gates[]` entry should include `proveFail`: a command that must fail on a
 known-bad input.
 
-The verifier and devops agents read this list. They do not invent
+The verifier reads this list. Agents do not invent
 `pnpm lint` because a template once said so.
 
 ## Hygiene
 
 `scripts/hygiene.mjs` fails the pack if any source agent contains product
 leakage (design hexes, this repo's git remote, hardcoded exclusive package
-manager, the old design-resource URL list). `yarn sync` runs hygiene first.
+manager, the old design-resource URL list) or exceeds **200 lines**.
+`yarn sync` runs hygiene first.
+
+### Agent file size
+
+Each markdown file under `agents/` — entry files (`agents/<role>.md`) and
+partials (`agents/<role>/*.md`) — must stay **under 200 lines**. When a role
+outgrows that limit:
+
+1. Keep `agents/<role>.md` as the entry point (YAML frontmatter + identity +
+   pointers).
+2. Move detailed checklists, examples, or domain sections into
+   `agents/<role>/<topic>.md`.
+3. Reference partials from the entry file and from each other with repo paths,
+   e.g. `Read agents/verifier/coverage-matrix.md before writing tests.`
+
+Do **not** paste partial contents back into the entry file at sync time. Agents
+read the referenced files when the task needs that depth — same pattern as
+`context/` and `skills/closed-loop/gates.md`.
+
+Kernel-generic lessons belong in `gates.md` or the ledger, not in longer agent
+files.
 
 ## Roster (unchanged jobs, slimmer files)
 
 Required on a **whole-app** closed-loop run:
 
-`product-spec → architect → implementer → verifier → reviewer +
+`software-engineer → verifier → reviewer +
 security-reviewer → qa-acceptance → integrator`
 
-Optional: `design-ux`, `devops`, `docs`, `release`, `monitor`, `debugger`.
-
-Specialists (delegated from implementer, not pipeline stages): `frontend`,
-`backend`, `data`, `mobile`, `performance`, `compliance`, `cost`.
+The software-engineer owns spec, architecture, and all code directly.
 
 Incremental work in an existing repo uses the host review classification
 (substantial / minor / trivial) — not the eight-agent clamp. The clamp is

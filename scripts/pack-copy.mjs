@@ -82,6 +82,11 @@ export async function purgeDoNotCopy(destRoot, manifest) {
   }
 }
 
+export async function resetAgentsAndSkills(destRoot) {
+  await rm(join(destRoot, "agents"), { recursive: true, force: true });
+  await rm(join(destRoot, "skills"), { recursive: true, force: true });
+}
+
 /**
  * Rewrite a directory ignore of loop/ or loop/** to loop/* plus ledger negations.
  */
@@ -93,7 +98,10 @@ export function fixLoopGitignore(content) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!replacedLoop && (trimmed === "loop/" || trimmed === "loop/**")) {
-      out.push("loop/*", "!loop/learnings.md", "!loop/learnings.jsonl");
+      // Handoff JSONs are transient scratch (promoted by the retro into
+      // docs/agents/skills), so they stay ignored — only the ledger and
+      // loop markdown are tracked.
+      out.push("loop/*", "!loop/learnings.md", "!loop/*.md");
       replacedLoop = true;
       continue;
     }

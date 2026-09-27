@@ -6,15 +6,10 @@ import { spawn } from "node:child_process";
 import { describe, it } from "node:test";
 import { REPO_ROOT } from "./types.js";
 
-async function lintAgents(root: string) {
-  const mod = await import("../../scripts/hygiene.mjs");
-  return mod.lintAgents(root);
-}
-
 describe("pack hygiene", () => {
   it("every role file points at context/README.md and leaks no product facts", async () => {
     const { filesChecked, violations } = await lintAgents(REPO_ROOT);
-    assert.ok(filesChecked >= 20, `expected a full roster, got ${filesChecked}`);
+    assert.ok(filesChecked >= 8, `expected the 8-agent required team, got ${filesChecked}`);
     assert.equal(
       violations.length,
       0,
@@ -39,31 +34,44 @@ describe("pack hygiene", () => {
     );
   });
 
+  it("lintAgents fails when an agent file exceeds maxAgentLines", async () => {
+    const root = await mkdtemp(join(tmpdir(), "pack-long-"));
+    await mkdir(join(root, "agents"), { recursive: true });
+    await mkdir(join(root, "pack"), { recursive: true });
+    await cpRules(root);
+    await writeFile(
+      join(root, "agents", "bloated.md"),
+      `---\nname: bloated\n---\nRead context/README.md\n${"x\n".repeat(201)}`,
+    );
+    const { violations } = await lintAgents(root);
+    assert.ok(
+      violations.some((v) => v.file === "bloated.md" && v.kind === "tooLong"),
+      "overlong agent must produce a tooLong violation",
+    );
+  });
+
   it("documents the install tree in pack/SETUP.md", async () => {
     const setup = await readFile(join(REPO_ROOT, "pack", "SETUP.md"), "utf-8");
     assert.match(setup, /closed-loop-agents/);
     assert.match(setup, /building-blocks/);
     assert.match(setup, /context\//);
     assert.match(setup, /init-pack/);
-    assert.match(setup, /closed-loop-agents sync/);
-    assert.match(setup, /agentRoster/);
+    assert.match(setup, /export-template/);
   });
 
   it("fixLoopGitignore rewrites loop/ so learnings are not ignored", async () => {
-    const { fixLoopGitignore } = await import("../../scripts/pack-copy.mjs");
+    const { fixLoopGitignore } = await loadPackCopy();
     const fixed = fixLoopGitignore("loop/\nnode_modules/\n");
     assert.match(fixed, /^loop\/\*/m);
     assert.match(fixed, /!loop\/learnings\.md/);
-    assert.match(fixed, /!loop\/learnings\.jsonl/);
 
     const dest = await mkdtemp(join(tmpdir(), "pack-gitignore-"));
     await spawnOk("git", ["init"], dest);
     await mkdir(join(dest, "loop"), { recursive: true });
     await writeFile(join(dest, ".gitignore"), "loop/\n");
-    await writeFile(join(dest, "loop", "learnings.md"), "# ledger\n");
-    await writeFile(join(dest, "loop", "learnings.jsonl"), "");
+    await writeFile(join(dest, "loop", "learnings.md"), "# Open Questions\n");
 
-    const { mergeGitignore } = await import("../../scripts/pack-copy.mjs");
+    const { mergeGitignore } = await loadPackCopy();
     const snippet = await readFile(join(REPO_ROOT, "pack", "templates", "gitignore.snippet"), "utf-8");
     await mergeGitignore(dest, snippet);
 
@@ -71,6 +79,41 @@ describe("pack hygiene", () => {
     assert.equal(ignored, false, "loop/learnings.md must not be ignored after mergeGitignore");
   });
 });
+
+type HygieneViolation = {
+  file: string;
+  kind: string;
+  needle: string;
+};
+
+type HygieneModule = {
+  lintAgents: (
+    root?: string,
+  ) => Promise<{ filesChecked: number; violations: HygieneViolation[] }>;
+};
+
+type PackCopyModule = {
+  fixLoopGitignore: (content: string) => string;
+  mergeGitignore: (
+    destRoot: string,
+    snippet: string,
+    options?: { overwrite?: boolean },
+  ) => Promise<void>;
+};
+
+async function importRootScript<T>(relativeFromHere: string): Promise<T> {
+  const href = new URL(relativeFromHere, import.meta.url).href;
+  return (await import(href)) as T;
+}
+
+async function loadPackCopy() {
+  return importRootScript<PackCopyModule>("../../scripts/pack-copy.mjs");
+}
+
+async function lintAgents(root: string) {
+  const mod = await importRootScript<HygieneModule>("../../scripts/hygiene.mjs");
+  return mod.lintAgents(root);
+}
 
 async function cpRules(root: string) {
   const rules = await readFile(join(REPO_ROOT, "pack", "hygiene-rules.json"), "utf-8");

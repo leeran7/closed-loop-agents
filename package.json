@@ -11,7 +11,7 @@
   },
   "files": [
     "agents",
-    "skills/closed-loop",
+    "skills",
     "handoffs/schema.json",
     "pack",
     "scripts",
