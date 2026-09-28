@@ -68,10 +68,11 @@ function extractName(frontmatterRaw) {
 
 function extractDescription(frontmatterRaw) {
   const single = frontmatterRaw.match(/^description:\s+(.+)$/m);
-  if (single && !single[1].startsWith(">")) return single[1].trim();
-  const folded = frontmatterRaw.match(/^description:\s*>-?\n((?:[ \t]+.*\n?)*)/m);
-  if (!folded) return "";
-  return folded[1].replace(/\n\s*/g, " ").trim();
+  if (single && !/^[|>]/.test(single[1])) return single[1].trim();
+  // Folded (`>`) or literal (`|`) block scalar, either chomped (`-`) or not.
+  const block = frontmatterRaw.match(/^description:\s*[|>]-?\n((?:[ \t]+.*\n?)*)/m);
+  if (!block) return "";
+  return block[1].replace(/\n\s*/g, " ").trim();
 }
 
 function toCodexToml(name, description, composedBody) {
@@ -188,6 +189,12 @@ async function syncAgents(targetRoot, protocolBody) {
   const { config: claudeConfig, source: claudeConfigSrc } = await resolveClaudeConfig(targetRoot);
   const sources = await resolveAgentSources(targetRoot);
 
+  // These three dirs are fully generated output — clear them first so an
+  // agent dropped from the roster (e.g. a consolidation) doesn't leave a
+  // stale generated file behind that no source file backs anymore.
+  await rm(join(targetRoot, ".claude", "agents"), { recursive: true, force: true });
+  await rm(join(targetRoot, ".cursor", "agents"), { recursive: true, force: true });
+  await rm(join(targetRoot, ".codex", "agents"), { recursive: true, force: true });
   await mkdir(join(targetRoot, ".claude", "agents"), { recursive: true });
   await mkdir(join(targetRoot, ".cursor", "agents"), { recursive: true });
   await mkdir(join(targetRoot, ".codex", "agents"), { recursive: true });
@@ -244,6 +251,12 @@ async function syncSkills(targetRoot) {
     join(targetRoot, ".claude", "skills"),
     join(targetRoot, ".agents", "skills"),
   ];
+
+  // Generated output — clear so a skill pack removed from the source no
+  // longer lingers as a dangling symlink.
+  for (const dest of targets) {
+    await rm(dest, { recursive: true, force: true });
+  }
 
   for (const [name, srcDir] of byName) {
     for (const dest of targets) {

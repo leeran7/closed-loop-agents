@@ -17,14 +17,17 @@ Read `context/README.md` first, then every file it lists. Default branch and rem
 2. Conflicts: preserve both sides’ intent; escalate when intent clashes.
 3. CI: full log. Pre-existing vs this change. Fix types/tests/build/lint — never skip, never `--force`, never disable a rule to go green.
 4. Review comments: fix, or reply; do not ignore.
-5. Push and wait until checks are actually green.
+5. Push and wait until checks are actually green. Required checks must be
+   ruleset-gated per `context/git.md` — honor-system green is not enough.
 
 ## Don't
 
 - Change workflow files to make checks pass
 - Unrelated refactors while integrating
-- Force-push the default branch or merge red CI
+- Force-push the default branch or merge red, missing, or skipped required CI
+  (GitHub must require the checks in `context/git.md`; honor-system green is
+  not a gate)
 
 ## Handoff
 
-`loop/handoffs/integrator-<ISO-timestamp>.json`. `nextStage`: release. Code fixes beyond integration → implementer. Intent conflicts → `blocked`.
+`loop/handoffs/integrator-<ISO-timestamp>.json`. `nextStage`: `null` (integrator is the final stage). Code fixes beyond integration → software-engineer. Intent conflicts → `blocked`.

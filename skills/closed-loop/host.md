@@ -1,8 +1,8 @@
 # Closed-loop host instructions
 
-Generic body for `CLAUDE.md` / `AGENTS.md`. `init-pack` (vendor mode) writes
-this when those files do not already exist. Product facts belong in
-`context/`, not here.
+Generic body for `CLAUDE.md` / `AGENTS.md`. `init-pack` writes this when
+those files do not already exist. Product facts belong in `context/`, not
+here.
 
 **New repo?** Start at [`pack/SETUP.md`](pack/SETUP.md) (file tree +
 5-minute install).
@@ -15,13 +15,14 @@ this when those files do not already exist. Product facts belong in
 | This product’s facts | `context/README.md` |
 | Protocol | `skills/closed-loop/protocol.md` |
 | Kernel gates | `skills/closed-loop/gates.md` |
-| Memory | `loop/learnings.md` + `loop/learnings.jsonl` |
-| Roles | `agents/*.md` (sync to `.cursor/`, `.claude/`, `.codex/`) |
+| Memory | `loop/learnings.md` (open questions only) |
+| Roles | `agents/*.md` (sync to `.cursor/agents/` and `.claude/agents/`) |
 
-Roles and the closed-loop skill come from the `closed-loop-agents` package
-(`node_modules/closed-loop-agents`); this repo's own `agents/` and
-`skills/` hold only local overrides or additions. Edit either, then run
-`npx closed-loop-agents sync`.
+This repo **is** the `closed-loop-agents` package — other repos install it
+as a dependency (`yarn add -D github:leeran7/closed-loop-agents#main`) and
+run `npx closed-loop-agents sync`. Edit `agents/` or `skills/` here, then
+run `node scripts/sync.mjs` to regenerate this repo's own `.cursor/`/
+`.claude/`/`.codex/` and `node scripts/hygiene.mjs` before committing.
 
 ## Agent review is mandatory
 
@@ -35,14 +36,14 @@ No exceptions except production hotfixes (push first, complete review within
 | Trivial (comment typo, README formatting, no code) | none |
 | Docs with code/scripts | `@reviewer` + `@security-reviewer` |
 
-Read the ledger → implement → dispatch reviewers in parallel → fix
-**critical** findings → re-run until `status: success` → record learnings.
+Implement → dispatch reviewers in parallel → fix **critical** findings →
+re-run until `status: success`. The orchestrator retro promotes learnings.
 
 Read-only reviewers cannot write `loop/`. The caller persists their
 `learnings` arrays.
 
-Do not paste new standing rules into all 22 agent files. Product facts go
-in `context/` or `loop/learnings.md`. Kernel-generic `[all]` lessons are
+Do not paste rules into agent files. Product facts go in `context/`.
+Open questions go in `loop/learnings.md`. Kernel-generic lessons are
 proposed for `skills/closed-loop/gates.md`.
 
 ## Orchestrator must run the team
@@ -55,10 +56,11 @@ missing handoff is **failed**. After verifier: `reviewer` and
 ## Loop runtime
 
 `loop/state.json` and `loop/handoffs/` are per-run (gitignored).
-`loop/learnings.md` and `loop/learnings.jsonl` are persistent memory.
+`loop/learnings.md` holds open questions only (persistent, versioned).
 
 ## Start a whole-app loop
 
 - Cursor: `@orchestrator` or the closed-loop skill
 - Claude Code: `/closed-loop`
-- Programmatic: `npx closed-loop-agents loop "…"` (`CURSOR_API_KEY`)
+- Codex: `/closed-loop`
+- Programmatic: `yarn loop "…"` (`CURSOR_API_KEY`)
