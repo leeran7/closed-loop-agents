@@ -21,6 +21,9 @@ jobs:
             (echo "::error::Generated outputs are stale - run 'node scripts/sync.mjs' and commit." && exit 1)
       - name: Hygiene checks
         run: node scripts/hygiene.mjs
+      - name: render-3d skill tests
+        # Chrome-dependent cases skip gracefully when no browser is present.
+        run: node --test "skills/render-3d/test/*.mjs"
       - name: Install orchestrator deps
         run: yarn --cwd orchestrator install --frozen-lockfile
       - name: Orchestrator tests

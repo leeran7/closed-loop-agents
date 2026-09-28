@@ -4,29 +4,13 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-### Changed
-- Consolidated the agent roster from 22 role files down to 7
-  (`orchestrator`, `software-engineer`, `verifier`, `reviewer`,
-  `security-reviewer`, `qa-acceptance`, `integrator`), matching the
-  roster already shipped in the source product repo. The
-  `software-engineer` role now owns spec, architecture, and implementation
-  directly instead of splitting across `product-spec` / `architect` /
-  `implementer`.
-- `pack/MANIFEST.json` kernel now covers all of `skills/**` (not just
-  `skills/closed-loop/`) and `bin/**`, so the reusable skill packs the new
-  roster depends on (`accessibility`, `api-design`, `boy-scout`, `ci-cd`,
-  `closed-loop-participant`, `create-skill`, `debugging`, `design-review`,
-  `github`, `migration`, `monorepo`, `performance`, `regression`) and
-  `bin/cli.mjs` travel with every future export instead of drifting.
-- `scripts/sync.mjs` now clears `.claude/agents/`, `.cursor/agents/`,
-  `.codex/agents/`, and the synced skills directories before regenerating
-  them, so a role or skill dropped from the source roster no longer leaves
-  a stale generated file behind.
-
-### Fixed
-- `CLAUDE.md`, `AGENTS.md`, and `skills/closed-loop/{host,pack}.md` no
-  longer refer to "22 agent files" — the wording and pipeline diagrams now
-  match the 7-agent roster.
+### Added
+- `skills/render-3d`: 3D rendering skill (issue #5). Plain-words prompt →
+  Three.js scene module + headless preview screenshot + integration snippet.
+  Pluggable model backend (`openai` / deterministic `stub`); the preview
+  gate fails the run on any JS render error. Ships with an MCP-server
+  wrapper (`mcp-server/server.mjs`) exposing `render-scene` and
+  `preview-scene` tools for `claude mcp add`. Skill tests run in CI.
 
 ## [1.0.0] - 2026-09-27
 
