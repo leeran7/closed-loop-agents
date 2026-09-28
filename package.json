@@ -11,7 +11,8 @@
   },
   "files": [
     "agents",
-    "skills",
+    "skills/closed-loop",
+    "skills/render-3d",
     "handoffs/schema.json",
     "pack",
     "scripts",
